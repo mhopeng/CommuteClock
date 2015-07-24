@@ -5,8 +5,8 @@
 # Script to display the estimated arrival time and recent history for a car commute
 #  on a 7-segment LED and a multicolor 8x8 LED matrix controlled by a Raspberry Pi.
 #  Uses the traffic data from 511 (Caltrans), and requires a 511 developer token.
-# Uses configuration file "CommuteClock.cfg" in same directory, or give location as first
-#  command line argument.
+# Uses configuration file "CommuteClock.cfg" in same directory, or give config file 
+#  location as first command line argument.
 #
 #  511 API info at: http://511.org/developer-resources_driving-times-api.asp
 #  Hardware info at: https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up
@@ -14,6 +14,9 @@
 # Matt Hopcroft
 #  mhopeng@gmail.com
 #
+# v1.6 Jul2015
+#	move try loop inside main loop
+#	handle Connection errors
 # v1.5 Jul2015
 #   add EST_OTHER to config file
 #   add PREF_ROUTE to config file
@@ -30,7 +33,12 @@
 #	startup splash is now the xy axes
 # v1.0 Jan2015
 #
-# Example URL:
+
+#
+# 511 Driving Times API
+#  See: http://511.org/developer-resources_driving-times-api.asp
+# 
+# Example Request URL:
 # wget -O drivetime1.xml "http://services.my511.org/traffic/getpathlist.aspx?token=xxxxxxxx-yyyy-zzzz-wwww-vvvvvvvvvvvv&o=88&d=1061"
 #
 # Example Response:
@@ -53,8 +61,19 @@
 # </paths>
 #
 
-# NOTE: The 8x8 Bi-Color LED Matrix display is intended to be installed/viewed upside down
-#  from the orientation assumed by the interface library. This makes the code easier.
+#
+# Hardware: This script is designed for a Raspberry Pi which is connected to two LED displays:
+#
+#	1) Seven-segment display with controller backpack:
+#		https://www.adafruit.com/products/879
+#	2) 8x8 multicolor LED matrix display:
+#		http://www.adafruit.com/products/902
+#
+# NOTE: The 8x8 Bi-Color LED Matrix display is intended to be installed/viewed rotated 180
+#  from the orientation assumed by the interface library. This makes the code easier: the
+#  origin (0,0) is located at the bottom right, and updates move the data to the left
+#  simply by pushing onto the array.
+#
 
 from __future__ import division
 import os, sys, time
@@ -81,30 +100,14 @@ else:
 	
 
 ##
-verstring = "CommuteClock v1.5"
+verstring = "CommuteClock v1.6"
 ##
 
-# User credentials for the 511.org Driving Times API. Register at:
-#  http://www.511.org/developer-resources_driving-times-api.asp
-#USER_CRED = 'xxxxxxxx-yyyy-zzzz-wwww-vvvvvvvvvvvv'
-# Start point: Daly city I-280 / CA 1 intersection
-#START_POINT='1473'
-# Endpoint: Menlo Park, Sandhill Rd. exit from I-280 S
-#END_POINT='1061'
-# Time between updates ("x axis") in minutes
-#UPDATE_INTERVAL = 3
-# Commute time per pixel ("y axis") in minutes
-#COMMUTE_PIXEL = 2
-# estOther is the drive time for the segments 511 does not include
-#  14 min to get to 280, 8 min to get from 280 to Stanford
-#estOther = 14 + 8 # v1.5 move to config file
-# Baseline value (no traffic, middle of the night)
-#baseTime = 22	# v1.2 not used
-# bar graph color levels (in minutes)
-#baselvl = 22 # v1.2 use reported typical time for baseline
-greenlvl = 2
-yellowlvl = 4
-redlvl = 7
+# "color levels" on the bar graph
+# these values are indexes in the array for the 8x8 matrix (i.e., 0:7)
+greenlvl = 2	# first two rows are green
+yellowlvl = 4	# next two rows are yellow
+redlvl = 7		# remaining four rows are red
 
 numRetries = 5 # number of retries before failing when 511 replies are malformed
 
@@ -113,7 +116,6 @@ numRetries = 5 # number of retries before failing when 511 replies are malformed
 def main(config_file):
 
 	print('{0}\n{1}: Display Commute data\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
-	data_file='commute_data.csv'
 	
 	# open the configuration file
 	print('Reading Config file ' + config_file)
@@ -132,6 +134,11 @@ def main(config_file):
 	# get the config values
 	try:
 		USER_CRED = config.get('USER','USER_CRED')
+		if config.has_option('USER','DATA_FILE'):
+			DATA_FILE = config.get('USER','DATA_FILE')
+			if DATA_FILE: print('Commute Data will be saved to: {0}'.format(DATA_FILE) )
+		else:
+			DATA_FILE = []
 		START_POINT = config.get('COMMUTE','START_POINT')
 		END_POINT = config.get('COMMUTE','END_POINT')
 		PREF_ROUTE = config.get('COMMUTE','PREF_ROUTE').split(',')
@@ -181,11 +188,11 @@ def main(config_file):
 	##
 	# main loop
 	print('')
-	try:
-		retries = 0			# for retrying when errors are received
-		update_count = 0	# for updating LED matrix
-		
-		while retries < numRetries:
+	retries = 0			# for retrying when errors are received
+	update_count = 0	# for updating LED matrix display
+	
+	while retries < numRetries:
+		try:
 
 			# blank colon to show update in progress
 			sevenseg.set_colon(False)
@@ -204,6 +211,7 @@ def main(config_file):
 				print('WARNING: 511 server returned an error ({0})\n'.format(retries) )
 				print(r.content)
 				retries += 1 # quit after trying a few times
+				continue
 			else: retries = 0
 
 			nowTime = time.localtime()
@@ -284,17 +292,18 @@ def main(config_file):
 			sevenseg.print_number_str(time.strftime('%H%M',estDriveTime))
 			sevenseg.write_display()
 
-			f=open(data_file,'a')
-			#f.write('{0},{1},{2},{3:.0f}\n'.format(time.mktime(nowTime),curTime,typTime,commScore) )
-			f.write('{0},{1},{2}\n'.format(time.mktime(nowTime),curTime,typTime) )
-			f.close()
+			# write results to file if desired
+			if DATA_FILE:
+				f=open(DATA_FILE,'a')
+				f.write('{0},{1},{2}\n'.format(time.mktime(nowTime),curTime,typTime) )
+				f.close()
 
 
 			## Update LED display
 			#   update at startup, and then at a multiple of data updates
 			if update_count == 0 or update_count > UPDATE_INTERVAL:
 				#print('Update LED matrix')
-				update_matrix(display,pxArray,curTime,typTime,incident_list,tiArray,COMMUTE_PIXEL)
+				pxArray,tiArray = update_matrix(display,pxArray,curTime,typTime,incident_list,tiArray,COMMUTE_PIXEL)
 				
 				# reset update count
 				update_count = 1
@@ -304,20 +313,25 @@ def main(config_file):
 			update_count += 1
 
 			# wait for the "whole minute" between updates
-			#print(60-time.localtime()[5])
-			#time.sleep((UPDATE_INTERVAL*60)-time.localtime()[5])
 			# v1.5: update time display every minute. Update LED matrix less often.
 			time.sleep(60-time.localtime()[5])
 			print('')
 
 
-	except KeyboardInterrupt:
-		print('\n** Program Stopped (INT signal) ** ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
-		streamEndTime=time.time() # time of stream end, unix epoch seconds
-		print('')
-	except:
-		print('* Other Exception * ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
-		print("Unexpected error: {0}".format(sys.exc_info()) )
+		# Use Ctrl-C to quit manually, or for Supervisord to kill process
+		except KeyboardInterrupt:
+			print('\n** Program Stopped (INT signal) **  ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
+			streamEndTime=time.time() # time of stream end, unix epoch seconds
+			#print("sys.exec_info(): {0}".format(sys.exc_info()) )
+			break
+			print('')
+		except ConnectionError:
+			print('\n** Connection Error **  ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
+			print("     Will Retry Connection...")
+			retries += 1 # quit after trying a few times
+		except:
+			print('\n** Other Exception **  ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
+			print("Unexpected error: {0}".format(sys.exc_info()) )
 
 
 	if retries > 0:
