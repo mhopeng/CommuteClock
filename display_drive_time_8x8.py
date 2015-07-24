@@ -1,13 +1,19 @@
 #!/usr/bin/python
 #
-# Script to display the traffic info from 511 (Caltrans) for the 280S commute
-#  on a multicolor 8x8 LED matrix
+# Script to display the traffic info from 511 (Caltrans) for the I-280S commute
+#  on a multicolor 8x8 LED matrix.
+# Uses configuration file "CommuteClock.cfg" in same directory, or give location as first
+#  command line argument.
+#
 #  API info at: http://511.org/developer-resources_driving-times-api.asp
 #  Hardware info at: https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up
 #
 # Matthew Hopcroft
 #   mhopeng@gmail.com
 #
+# v1.4 Jun2015
+#   use config file
+#   better error checking for response
 # v1.3 Jun2015
 #	startup animation
 # v1.2 Jun2015
@@ -58,15 +64,30 @@ from Adafruit_LED_Backpack import SevenSegment
 # Note: pixel color values are globals:
 #   BicolorMatrix8x8.RED, BicolorMatrix8x8.GREEN, BicolorMatrix8x8.YELLOW
 
-verstring = "CommuteClock v1.3"
+# Use a config file (v1.4)
+import ConfigParser
+if len(sys.argv) < 2:
+	config_file = os.path.dirname(os.path.abspath(__file__) )
+	config_file = os.path.join(config_file,'CommuteClock.cfg')
+else:
+	config_file = sys.argv[1]
+	
+
+##
+verstring = "CommuteClock v1.4"
+##
+
+# User credentials for the 511.org Driving Times API. Register at:
+#  http://www.511.org/developer-resources_driving-times-api.asp
+#USER_CRED = '1d19c537-9bf7-4687-bc8f-1e6e13c22ba7'
 # Start point: Daly city I-280 / CA 1 intersection
-START_POINT='1473'
+#START_POINT='1473'
 # Endpoint: Menlo Park, Sandhill Rd. exit from I-280 S
-END_POINT='1061'
+#END_POINT='1061'
 # Time between updates ("x axis") in minutes
-UPDATE_INTERVAL = 3
+#UPDATE_INTERVAL = 3
 # Commute time per pixel ("y axis") in minutes
-COMMUTE_PIXEL = 2
+#COMMUTE_PIXEL = 2
 # estOther is the drive time for the segments 511 does not include
 #  14 min to get to 280, 8 min to get from 280 to Stanford
 estOther = 14 + 8
@@ -78,18 +99,47 @@ greenlvl = 2
 yellowlvl = 4
 redlvl = 7
 
-print('{0}\n{1}: Display Commute data\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
-data_file='commute_data.csv'
+numRetries = 5
 
-def main():
+
+
+def main(config_file):
+
+	print('{0}\n{1}: Display Commute data\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
+	data_file='commute_data.csv'
+	
+	# Open the configuration file
+	print('Reading Config file ' + config_file)
+	config = ConfigParser.SafeConfigParser()
+	try:
+		config_info = config.read(config_file)
+		if not config_info:
+			print('ERROR: config file not found ("{0}")'.format(config_file) )
+			sys.exit(1)
+	except:
+		print('ERROR: Problem with config file (missing, bad format, etc)')
+		print('    (Config file "{0}")'.format(config_file) )
+		print("Unexpected error: {0}".format(sys.exc_info()) )
+		sys.exit(1)
+		
+	# get the config values
+	try:
+		USER_CRED = config.get('USER','USER_CRED')
+		START_POINT = config.get('COMMUTE','START_POINT')
+		END_POINT = config.get('COMMUTE','END_POINT')
+		UPDATE_INTERVAL = int(config.get('DISPLAY','UPDATE_INTERVAL'))
+		COMMUTE_PIXEL = int(config.get('DISPLAY','COMMUTE_PIXEL'))
+	except:
+		print("ERROR: Unable to read from config file")
+		print(" Unexpected error: {0}".format(sys.exc_info()) )
+		sys.exit(1)
+		
 
 	# initialize LED displays
-	# Create display instance on default I2C address (0x70) and bus number.
+	print('Initializing LED displays')
+	# Create display instance with I2C address (eg 0x70).
 	display = BicolorMatrix8x8.BicolorMatrix8x8(address=0x70)
 	sevenseg = SevenSegment.SevenSegment(address=0x72)
-
-	# Alternatively, create a display with a specific I2C address and/or bus.
-	# display = Matrix8x8.Matrix8x8(address=0x74, busnum=1)
 
 	# Initialize the display(s). Must be called once before using the display.
 	display.begin()
@@ -120,8 +170,10 @@ def main():
 	edraw.line((1,6,6,1), fill=(255,0,0))
 
 	# main loop
+	print('')
 	try:
-		while 1:
+		retries = 0
+		while retries < numRetries:
 
 			# blank colon to show update in progress
 			sevenseg.set_colon(False)
@@ -129,15 +181,18 @@ def main():
 			print('Requesting traffic data from CalTrans...')
 
 			# get the traffic info
-			r = requests.get('http://services.my511.org/traffic/getpathlist.aspx?token=1d19c537-9bf7-4687-bc8f-1e6e13c22ba7&o={0}&d={1}'.format(START_POINT,END_POINT))
+			r = requests.get('http://services.my511.org/traffic/getpathlist.aspx?token={2}&o={0}&d={1}'.format(START_POINT,END_POINT,USER_CRED))
 
 			if r.status_code != 200:
 				print('ERROR: Problem with URL request')
 				print('Response status code {0}'.format(r.status_code) )
-				# show error on display
-				display.set_image(errorImage)
-				display.write_display()
-				sys.exit(r.status_code)
+				retries += 1
+			
+			elif r.content.find('Error') >= 0:
+				print('WARNING: 511 server returned an error ({0})\n'.format(retries) )
+				print(r.content)
+				retries += 1 # quit after trying a few times
+			else: retries = 0
 
 			# blank colon to show update in progress
 			sevenseg.set_colon(True)
@@ -271,17 +326,22 @@ def main():
 		print('\n** Program Stopped (INT signal) ** ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
 		streamEndTime=time.time() # time of stream end, unix epoch seconds
 		print('')
-	#except:
-	#	print('* Other Exception * ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
-	#	print("Unexpected error: {0}".format(sys.exc_info()) )
+	except:
+		print('* Other Exception * ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
+		print("Unexpected error: {0}".format(sys.exc_info()) )
 
 
-	#time.sleep(10)
-	display.clear()
-	display.write_display()
-	sevenseg.clear()
-	sevenseg.write_display()
-	print('Program Exit')
+	if retries > 0:
+		print('\nCommuteClock: Exit after {0} retries\n'.format(retries) )
+		# show error on display
+		display.set_image(errorImage)
+		display.write_display()
+	else:
+		display.clear()
+		display.write_display()
+		sevenseg.clear()
+		sevenseg.write_display()
+		print('CommuteClock: Program Exit\n')
 
 
 # a function for a "splash screen" at startup
@@ -308,4 +368,4 @@ def startup_splash(display):
 
 
 if __name__ == "__main__":
-    main()
+    main(config_file)
