@@ -42,6 +42,7 @@ import sys
 import time
 
 # The 511 Developer token to use for requesting data:
+#  Request a token (free registration) at: http://511.org/developer-resources_driving-times-api.asp
 api_token='1d19c537-9bf7-4687-bc8f-1e6e13c22ba7'
 # Start point: Daly city 280 S / CA 1 intersection
 startpoint='88'

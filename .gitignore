@@ -5,3 +5,12 @@
 
 # ignore the "Archives" directory, which contains zip files
 /Archives/
+
+# ignore security token file
+511.*
+
+# ignore xml data files
+*.xml
+
+# except for the examples
+!example*
