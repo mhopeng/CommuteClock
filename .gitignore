@@ -1,0 +1,7 @@
+# git ignore file for CommuteClock
+
+# ignore the OS X meta files
+**/.DS_Store
+
+# ignore the "Archives" directory, which contains zip files
+/Archives/
