@@ -8,6 +8,8 @@
 # Matthew Hopcroft
 #   mhopeng@gmail.com
 #
+# v1.3 Jun2015
+#	startup animation
 # v1.2 Jun2015
 #	incident display coincides with time
 # v1.1 Jun2015
@@ -53,10 +55,10 @@ import ImageDraw
 # use AdaFruit libraries for hardware
 from Adafruit_LED_Backpack import BicolorMatrix8x8
 from Adafruit_LED_Backpack import SevenSegment
-
 # Note: pixel color values are globals:
 #   BicolorMatrix8x8.RED, BicolorMatrix8x8.GREEN, BicolorMatrix8x8.YELLOW
 
+verstring = "CommuteClock v1.3"
 # Start point: Daly city I-280 / CA 1 intersection
 START_POINT='1473'
 # Endpoint: Menlo Park, Sandhill Rd. exit from I-280 S
@@ -69,19 +71,19 @@ COMMUTE_PIXEL = 2
 #  14 min to get to 280, 8 min to get from 280 to Stanford
 estOther = 14 + 8
 # Baseline value (no traffic, middle of the night)
-baseTime = 22
+#baseTime = 22	# v1.2 not used
 # bar graph color levels (in minutes)
 #baselvl = 22 # v1.2 use reported typical time for baseline
 greenlvl = 2
 yellowlvl = 4
 redlvl = 7
 
-print('{0}\nCommuteClock: Display Commute data\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime())) )
+print('{0}\n{1}: Display Commute data\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
 data_file='commute_data.csv'
 
 def main():
 
-	# initialize LED display
+	# initialize LED displays
 	# Create display instance on default I2C address (0x70) and bus number.
 	display = BicolorMatrix8x8.BicolorMatrix8x8(address=0x70)
 	sevenseg = SevenSegment.SevenSegment(address=0x72)
@@ -92,7 +94,7 @@ def main():
 	# Initialize the display(s). Must be called once before using the display.
 	display.begin()
 	display.clear()
-	display.write_display()	
+	display.write_display()
 	sevenseg.begin()
 	sevenseg.clear()
 	sevenseg.write_display()
@@ -100,22 +102,9 @@ def main():
 	# turn on the colon to show that we are working...
 	sevenseg.set_colon(True)
 	sevenseg.write_display()
-	# show an image on 8x8 matrix at startup
-	#   (blatant ripoff from example file)
-	image = Image.new('RGB', (8, 8))
-	draw = ImageDraw.Draw(image)
-	#draw.rectangle((0,0,7,7), outline=(255,0,0), fill=(255,255,0))
-	# Draw an X with two green lines:
-	#draw.line((1,1,6,6), fill=(0,255,0))
-	#draw.line((1,6,6,1), fill=(0,255,0))
-	# Draw the xy axes (bottom and right):
-	draw.line((0,0,7,0), fill=(255,255,0))
-	draw.line((0,0,0,7), fill=(255,255,0))
-	# send the image to the display
-	display.set_image(image)
-	display.write_display()
-	time.sleep(2)
 
+	# show startup animation
+	startup_splash(display)
 
 	## Create 2D arrays for pixel values
 	# array for traffic intensity
@@ -133,12 +122,12 @@ def main():
 	# main loop
 	try:
 		while 1:
-		
+
 			# blank colon to show update in progress
 			sevenseg.set_colon(False)
 			sevenseg.write_display()
 			print('Requesting traffic data from CalTrans...')
-			
+
 			# get the traffic info
 			r = requests.get('http://services.my511.org/traffic/getpathlist.aspx?token=1d19c537-9bf7-4687-bc8f-1e6e13c22ba7&o={0}&d={1}'.format(START_POINT,END_POINT))
 
@@ -149,11 +138,11 @@ def main():
 				display.set_image(errorImage)
 				display.write_display()
 				sys.exit(r.status_code)
-				
+
 			# blank colon to show update in progress
 			sevenseg.set_colon(True)
 			sevenseg.write_display()
-			
+
 			nowTime = time.localtime()
 
 			# r.content contains the reply XML string
@@ -168,11 +157,11 @@ def main():
 			#  in this case there should be only one path
 			paths = root.findall('path')
 			if len(paths) > 1:
-				print('WARNING: received {0} possible paths. Using first in list.'.format(len(paths)) )				
+				print('WARNING: received {0} possible paths. Using first in list.'.format(len(paths)) )
 			if len(paths) == 0:
 				print('ERROR: no routes found')
 				sys.exit(1)
-				
+
 			# get roads in path
 			road_list = []
 			segments = paths[0].find('segments')
@@ -200,13 +189,13 @@ def main():
 					print('  {0}'.format(incident.text) )
 			else:
 				print(' No traffic incidents reported at this time')
-		
-		
+
+
 			## Update LED display
-			
+
 			# Clear the display buffer.
 			display.clear()
-		
+
 			# shift the display pixel array
 			pxArray.insert(0,pxArray.pop())
 			# clear old values
@@ -223,28 +212,28 @@ def main():
 				pxArray[0][greenlvl:dispTime] = [BicolorMatrix8x8.YELLOW] * (dispTime - greenlvl)
 			if dispTime > yellowlvl:
 				pxArray[0][yellowlvl:dispTime] = [BicolorMatrix8x8.RED] * (dispTime - yellowlvl)
-			
+
 			# write new pixel array
 			# Set pixel at position i, j to appropriate color.
 			for x in range(8):
 				for y in range(8):
 					display.set_pixel(x, y, pxArray[x][y])
-					
+
 			# put a yellow box on a display if traffic incident
 			if len(incident_list) > 0:
 				tiArray.insert(0,tiArray.pop())
-				tiArray[0]=BicolorMatrix8x8.YELLOW
+				tiArray[0] = BicolorMatrix8x8.YELLOW
 			else:
 				tiArray.insert(0,tiArray.pop())
 				tiArray[0]=0
 			#print(tiArray)
 			for x in range(8): display.set_pixel(x, 7, tiArray[x])
-			
+
 			# Write the display buffer to the hardware. This must be called to
 			#  update the actual display LEDs.
 			display.write_display()
-			
-		
+
+
 			# estimate arrival time
 			estDrive = estOther + curTime
 			estDriveTime = time.localtime(time.mktime(nowTime) + (60 * estDrive))
@@ -254,7 +243,7 @@ def main():
 			#print(time.strftime('%H%M',estDriveTime))
 			sevenseg.print_number_str(time.strftime('%H%M',estDriveTime))
 			sevenseg.write_display()
-		
+
 			#commScore = (1 - ((curTime - baseTime) / baseTime))*100
 			#if commScore >= 90:
 			#	commCondition = 'green'
@@ -266,12 +255,12 @@ def main():
 			#	commCondition = 'black'
 
 			#print(' Commute Condition {0} ({1:.0f}%)'.format(commCondition,commScore) )
-		
+
 			f=open(data_file,'a')
 			#f.write('{0},{1},{2},{3:.0f}\n'.format(time.mktime(nowTime),curTime,typTime,commScore) )
 			f.write('{0},{1},{2}\n'.format(time.mktime(nowTime),curTime,typTime) )
 			f.close()
-		
+
 			# wait for the "whole minute" between updates
 			#print(60-time.localtime()[5])
 			time.sleep((UPDATE_INTERVAL*60)-time.localtime()[5])
@@ -285,14 +274,37 @@ def main():
 	#except:
 	#	print('* Other Exception * ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
 	#	print("Unexpected error: {0}".format(sys.exc_info()) )
-	
+
 
 	#time.sleep(10)
 	display.clear()
-	display.write_display()	
+	display.write_display()
 	sevenseg.clear()
 	sevenseg.write_display()
 	print('Program Exit')
+
+
+# a function for a "splash screen" at startup
+def startup_splash(display):
+	# show an animation of the axes on the 8x8 bicolor display
+
+	# Clear the display buffer.
+	display.clear()
+
+	# axes appear
+	for k in range (8):
+		display.set_pixel(0, k, BicolorMatrix8x8.YELLOW)
+		display.set_pixel(k, 0, BicolorMatrix8x8.YELLOW)
+		display.write_display()
+		time.sleep(0.2)
+
+	# axes disappear
+	for k in range (8):
+		display.set_pixel(0, k, 0)
+		display.set_pixel(k, 0, 0)
+		display.write_display()
+		time.sleep(0.2)
+
 
 
 if __name__ == "__main__":
