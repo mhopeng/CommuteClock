@@ -5,8 +5,11 @@
 #  API info at: http://511.org/developer-resources_driving-times-api.asp
 #  Hardware info at: https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up
 #
-# mhopeng@gmail.com
+# Matthew Hopcroft
+#   mhopeng@gmail.com
 #
+# v1.2 Jun2015
+#	incident display coincides with time
 # v1.1 Jun2015
 #	added constants for update time
 #	startup splash is now the xy axes
@@ -60,13 +63,15 @@ START_POINT='1473'
 END_POINT='1061'
 # Time between updates ("x axis") in minutes
 UPDATE_INTERVAL = 3
-# estDrive is the total estimated drive time including the segments the 511 does not cover
+# Commute time per pixel ("y axis") in minutes
+COMMUTE_PIXEL = 2
+# estOther is the drive time for the segments 511 does not include
 #  14 min to get to 280, 8 min to get from 280 to Stanford
 estOther = 14 + 8
 # Baseline value (no traffic, middle of the night)
 baseTime = 22
 # bar graph color levels (in minutes)
-baselvl = 22
+#baselvl = 22 # v1.2 use reported typical time for baseline
 greenlvl = 2
 yellowlvl = 4
 redlvl = 7
@@ -103,17 +108,20 @@ def main():
 	# Draw an X with two green lines:
 	#draw.line((1,1,6,6), fill=(0,255,0))
 	#draw.line((1,6,6,1), fill=(0,255,0))
-	# Draw the xy axes (bottom and left):
+	# Draw the xy axes (bottom and right):
 	draw.line((0,0,7,0), fill=(255,255,0))
-	draw.line((7,0,7,7), fill=(255,255,0))
+	draw.line((0,0,0,7), fill=(255,255,0))
 	# send the image to the display
 	display.set_image(image)
 	display.write_display()
 	time.sleep(2)
 
 
-	# create 2D array for pixel values
+	## Create 2D arrays for pixel values
+	# array for traffic intensity
 	pxArray=[[0 for y in range(8)] for x in range(8)]
+	# array for traffic incidents (top line of display)
+	tiArray=[0 for x in range(8)]
 
 	# create image for "error message"
 	errorImage = Image.new('RGB', (8, 8))
@@ -204,8 +212,11 @@ def main():
 			# clear old values
 			pxArray[0] = [0 for k in range(8)]
 			# insert new values in pixel array
-			dispTime = int(max(0,curTime - baselvl)/2)
+			#  v1.2 - use reported typical value for baseline
+			#dispTime = int(max(0,curTime - baselvl)/COMMUTE_PIXEL)
+			dispTime = int(max(0,curTime - typTime)/COMMUTE_PIXEL)
 			#print('[dispTime: {0}]'.format(dispTime) )
+			# fill in values in the pixel array according to the "color levels"
 			if dispTime > 0:
 				pxArray[0][0:dispTime] = [BicolorMatrix8x8.GREEN] * (dispTime)
 			if dispTime > greenlvl:
@@ -221,10 +232,16 @@ def main():
 					
 			# put a yellow box on a display if traffic incident
 			if len(incident_list) > 0:
-				for x in range(8): display.set_pixel(x, 7, BicolorMatrix8x8.YELLOW)
+				tiArray.insert(0,tiArray.pop())
+				tiArray[0]=BicolorMatrix8x8.YELLOW
+			else:
+				tiArray.insert(0,tiArray.pop())
+				tiArray[0]=0
+			#print(tiArray)
+			for x in range(8): display.set_pixel(x, 7, tiArray[x])
 			
-			# Write the display buffer to the hardware.  This must be called to
-			# update the actual display LEDs.
+			# Write the display buffer to the hardware. This must be called to
+			#  update the actual display LEDs.
 			display.write_display()
 			
 		
