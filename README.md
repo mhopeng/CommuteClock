@@ -41,8 +41,8 @@ Suggested Procedure:
 1. Run the script "get_drive_time.sh" to retrieve an XML file that lists all of the nodes in the 511.org system. This file will be saved as "drive_origins1.xml".
 2. Go to the 511.org Traffic website and use the drop-down menus to determine the intersection closest to the start of your commute.
 3. Search the XML file (drive_origins1.xml) to find the intersection you selected in Step 1. Note the node number.
-4. Modify the script "get_drive_time.sh" to use the node number from Step 2 as the value for the variable "START".
-4. Go to the 511.org Traffic website and use the drop-down menus to determine the intersection closest to the end of your commute.
-5. Search the XML file (drive_destinations1.xml) to find the intersection you selected in Step 4. Note the node number.
-6. Modify the configuration file (CommuteClock.cfg) to include the numbers that you have determined in Steps 2 & 4.
-In addition, the configuration file value "EST_OTHER" is a simple constant which is meant to encompass the parts of the commute that are not included in the 511.org data.
+4. Modify the script "get_drive_time.sh" to use the node number from Step 2 as the value for the variable "START". Run the script again.
+5. Go to the 511.org Traffic website and use the drop-down menus to determine the intersection closest to the end of your commute.
+6. Search the XML file (drive_destinations1.xml) to find the intersection you selected in Step 5. Note the node number.
+7. Modify the configuration file (CommuteClock.cfg) to include the node numbers that you have determined in Steps 2 & 4.
+In addition, set the configuration file value "EST_OTHER", which is a simple constant which is meant to encompass the parts of the commute that are not included in the 511.org data.
