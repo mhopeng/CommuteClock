@@ -2,6 +2,8 @@
 A software + hardware project for predicting car commute times in the San Francisco Bay area. 
 
 CommuteClock is a hardware project to create a "clock" which displays the projected arrival time when traveling by car.
+The time shown on the clock is the time you should expect to arrive at your destination if you leave immediately.
+In addition, the recent traffic history is shown, so that you can see if conditions are getting better or worse.
 The project is designed for car commuters in the San Francisco Bay area and it makes use of the traffic data provided by 511.org.
 
 ![cclock_1](https://cloud.githubusercontent.com/assets/13460989/8977347/2ea9ce9e-364d-11e5-900f-bea73bebcab5.jpg)
