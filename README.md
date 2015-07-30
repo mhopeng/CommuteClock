@@ -27,22 +27,12 @@ The hardware design uses a Raspberry Pi with two LED displays:
 2. 8x8 multicolor LED matrix display with I2C controller:
 	http://www.adafruit.com/products/902
 	
+The python script "display_drive_time_8x8.py" will request the current driving times data and display the results on the LED displays.
+Various parameters for operation are given in the configuration file "CommuteClock.cfg". Sample configuration files for supervisord are included which will start the clock automatically when the RPi is booted.
+
 Documentation for connecting the displays and using the appropriate python libraries is here:  
 https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up	
 
 ![cclock_pi](https://cloud.githubusercontent.com/assets/13460989/8977349/326b9292-364d-11e5-8cb1-61277df2e736.jpg)
 
-The python script "display_drive_time_8x8.py" will request the current driving times data and display the results on the LED displays.
-Various parameters for operation are given in the configuration file "CommuteClock.cfg".	
-
-NOTE: The process for specifying the start and end points of the commute is manual and not straightforward. 511.org has assigned ID numbers or "nodes" to each intersection in the network of roads covered by their sensors. For example, the intersection of I-80 and University Avenue in Berkeley is node 1222. You need to select node numbers for the start and end points for the commute and enter them into the configuration file for the Commute Clock.  
-Suggested Procedure:  
-
-1. Run the script "get_drive_time.sh" to retrieve an XML file that lists all of the nodes in the 511.org system. This file will be saved as "drive_origins1.xml".
-2. Go to the 511.org Traffic website and use the drop-down menus to determine the intersection closest to the start of your commute.
-3. Search the XML file (drive_origins1.xml) to find the intersection you selected in Step 1. Note the node number.
-4. Modify the script "get_drive_time.sh" to use the node number from Step 2 as the value for the variable "START". Run the script again.
-5. Go to the 511.org Traffic website and use the drop-down menus to determine the intersection closest to the end of your commute.
-6. Search the XML file (drive_destinations1.xml) to find the intersection you selected in Step 5. Note the node number.
-7. Modify the configuration file (CommuteClock.cfg) to include the node numbers that you have determined in Steps 2 & 4.
-In addition, set the configuration file value "EST_OTHER", which is a simple constant which is meant to encompass the parts of the commute that are not included in the 511.org data.
+See the included configuration file for details of the configuration options.

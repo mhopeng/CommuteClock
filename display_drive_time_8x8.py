@@ -6,13 +6,20 @@
 #  on a 7-segment LED and a multicolor 8x8 LED matrix controlled by a Raspberry Pi.
 #  Uses the traffic data from 511.org (http://www.511.org).
 # The script uses configuration file "CommuteClock.cfg" in same directory, or give config 
-#   file location as first command line argument.
+#  file location as first command line argument. See the configuration file for 
+#  details about the configuration options, including route selection.
+#
+# Note: Yellow bars at the top of the recent history display (LED matrix) indicate that
+#  a traffic incident has been reported on the route by CHP. See the CHP incident webpage 
+#  for details: http://mobile.usablenet.com/mt/traffic.511.org/LatestNews?un_jtt_v_new_section=CurrentIncidents#CurrentIncidents
 #
 #  511 API info at: http://511.org/developer-resources_driving-times-api.asp
 #  Hardware info at: https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up
 #
 # Matt Hopcroft
 #  mhopeng@gmail.com
+#
+
 #
 # v1.7 Jul2015
 #   set default for preferred route to first route returned by 511
@@ -119,6 +126,7 @@ def main(config_file):
 
 	print('{0}\n\n{1}: Display Commute Time\n  [data provided by 511.org: http://www.511.org]\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
 	
+	##
 	# open the configuration file
 	print('Reading Config file ' + config_file)
 	config = ConfigParser.SafeConfigParser()
@@ -157,7 +165,7 @@ def main(config_file):
 		print(" Unexpected error: {0}".format(sys.exc_info()) )
 		sys.exit(1)
 		
-
+	##
 	# initialize LED displays
 	print('Initializing LED displays')
 	# Create display instance with I2C address (eg 0x70).
@@ -191,6 +199,7 @@ def main(config_file):
 	# Draw an X with two red lines:
 	edraw.line((1,1,6,6), fill=(255,0,0))
 	edraw.line((1,6,6,1), fill=(255,0,0))
+
 
 	##
 	# main loop
