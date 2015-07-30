@@ -9,6 +9,7 @@ The project is designed for car commuters in the San Francisco Bay area and it m
 The software portion of the project is a basically a simple example of using the 511.org API for Driving Times Services.
 
 The hardware portion of the project uses a Raspberry Pi with two LED displays to display two things:  
+
 1. A constantly updated estimate of the predicted arrival time for a given driving route.
 2. The recent history of the traffic conditions on the driving route.
 
@@ -18,6 +19,7 @@ The python script "get_drive_time.py" requests current driving times data from 5
 
 Hardware:  
 The hardware design uses a Raspberry Pi with two LED displays:
+
 1. Seven-segment display with I2C controller:
 	https://www.adafruit.com/products/879
 2. 8x8 multicolor LED matrix display with I2C controller:
