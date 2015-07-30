@@ -58,13 +58,18 @@ estOther = 14 + 8
 baseTime = 22
 
 # get the traffic info
-print('Requesting traffic data from CalTrans...')
+print('Requesting traffic data from 511.org... ({0} -> {1})'.format(startpoint,endpoint) )
 r = requests.get('http://services.my511.org/traffic/getpathlist.aspx?token={2}&o={0}&d={1}'.format(startpoint,endpoint,api_token))
 
 if r.status_code != 200:
 	print('ERROR: Problem with URL request')
 	print('Response status code {0}'.format(r.status_code) )
 	sys.exit(r.status_code)
+elif r.content.find('Error') >= 0:
+	print('WARNING: 511 server returned an error\n')
+	print(r.content)
+	print('')
+	sys.exit(1)
 	
 # establish time of data
 nowTime = time.localtime()
@@ -100,7 +105,7 @@ for pdx, path in enumerate(paths):
 		route_index = pdx
 
 
-print('{0}\nCaltrans/511 travel time for route {1} ({2})'.format(time.strftime('%A, %d %b %Y, %H:%M',nowTime),target_route,route_index) )
+print('{0}\nEstimated travel time for route {2}: {1}'.format(time.strftime('%A, %d %b %Y, %H:%M',nowTime),target_route,route_index) )
 
 
 # get Travel Times
@@ -123,4 +128,4 @@ else:
 # estimate arrival time
 estDrive = estOther + curTime
 print(' Estimated time of Arrival: {0}'.format(time.strftime('%A, %d %b %Y, %H:%M',time.localtime(time.mktime(nowTime) + (60 * estDrive)))) )
-print('')
+print('    [data provided by 511.org: http://www.511.org]\n')

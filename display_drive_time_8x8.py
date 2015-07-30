@@ -4,9 +4,9 @@
 #
 # Script to display the estimated arrival time and recent history for a car commute
 #  on a 7-segment LED and a multicolor 8x8 LED matrix controlled by a Raspberry Pi.
-#  Uses the traffic data from 511 (Caltrans), and requires a 511 developer token.
-# Uses configuration file "CommuteClock.cfg" in same directory, or give config file 
-#  location as first command line argument.
+#  Uses the traffic data from 511.org (http://www.511.org).
+# The script uses configuration file "CommuteClock.cfg" in same directory, or give config 
+#   file location as first command line argument.
 #
 #  511 API info at: http://511.org/developer-resources_driving-times-api.asp
 #  Hardware info at: https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up
@@ -14,6 +14,8 @@
 # Matt Hopcroft
 #  mhopeng@gmail.com
 #
+# v1.7 Jul2015
+#   set default for preferred route to first route returned by 511
 # v1.6 Jul2015
 #	move try loop inside main loop
 #	handle Connection errors
@@ -100,7 +102,7 @@ else:
 	
 
 ##
-verstring = "CommuteClock v1.6"
+verstring = "CommuteClock v1.7"
 ##
 
 # "color levels" on the bar graph
@@ -115,7 +117,7 @@ numRetries = 5 # number of retries before failing when 511 replies are malformed
 
 def main(config_file):
 
-	print('{0}\n{1}: Display Commute data\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
+	print('{0}\n\n{1}: Display Commute Time\n  [data provided by 511.org: http://www.511.org]\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
 	
 	# open the configuration file
 	print('Reading Config file ' + config_file)
@@ -133,7 +135,7 @@ def main(config_file):
 		
 	# get the config values
 	try:
-		USER_CRED = config.get('USER','USER_CRED')
+		API_TOKEN = config.get('USER','API_TOKEN')
 		if config.has_option('USER','DATA_FILE'):
 			DATA_FILE = config.get('USER','DATA_FILE')
 			if DATA_FILE: print('Commute Data will be saved to: {0}'.format(DATA_FILE) )
@@ -141,7 +143,12 @@ def main(config_file):
 			DATA_FILE = []
 		START_POINT = config.get('COMMUTE','START_POINT')
 		END_POINT = config.get('COMMUTE','END_POINT')
-		PREF_ROUTE = config.get('COMMUTE','PREF_ROUTE').split(',')
+		if config.has_option('COMMUTE','PREF_ROUTE'):
+			PREF_ROUTE = config.get('COMMUTE','PREF_ROUTE').split(',')
+			if PREF_ROUTE: print('Preferred commute route: {0}'.format(PREF_ROUTE) )
+		else:
+			PREF_ROUTE = []
+		#PREF_ROUTE = config.get('COMMUTE','PREF_ROUTE').split(',')
 		EST_OTHER = int(config.get('COMMUTE','EST_OTHER'))
 		UPDATE_INTERVAL = int(config.get('DISPLAY','UPDATE_INTERVAL'))
 		COMMUTE_PIXEL = int(config.get('DISPLAY','COMMUTE_PIXEL'))
@@ -197,10 +204,10 @@ def main(config_file):
 			# blank colon to show update in progress
 			sevenseg.set_colon(False)
 			sevenseg.write_display()
-			print('Requesting traffic data from CalTrans...')
+			print('Requesting traffic data from 511.org...')
 
 			# get the traffic info
-			r = requests.get('http://services.my511.org/traffic/getpathlist.aspx?token={2}&o={0}&d={1}'.format(START_POINT,END_POINT,USER_CRED))
+			r = requests.get('http://services.my511.org/traffic/getpathlist.aspx?token={2}&o={0}&d={1}'.format(START_POINT,END_POINT,API_TOKEN))
 
 			if r.status_code != 200:
 				print('ERROR: Problem with URL request')
@@ -228,30 +235,32 @@ def main(config_file):
 				print('ERROR: XML parse error.')
 				continue
 
-			# the xml tree contains "paths", i.e. possible routes
-			#  in this case there should be only one path
+			# the xml tree contains "paths", i.e. possible driving routes
+			#  usually the shortest route is listed first but this is not guaranteed
 			paths = root.findall('path')
 			if len(paths) > 1 and len(PREF_ROUTE) == 0:
-				print('WARNING: received {0} possible paths. Using first in list.'.format(len(paths)) )
+				print('WARNING: Received {0} possible routes.'.format(len(paths)) )
 			if len(paths) == 0:
 				print('ERROR: no routes found')
 				sys.exit(1)
 
 			# get roads in possible routes ("paths"), match a route to preferred route
+			#  if one was specified in config file
 			route_index = []
-			for pdx, path in enumerate(paths):
-				road_list = []
-				#print(' Path {0}:'.format(pdx) )
-				segments = paths[pdx].find('segments')
-				segment_list = segments.findall('segment')
-				for seg in segment_list:
-					road = seg.find('road')
-					#print('  {0}'.format(road.text) )
-					road_list.append(road.text)
-				if road_list == PREF_ROUTE:
-					#print('Using Route {0}'.format(pdx) )
-					route_index = pdx
-					break
+			if len(PREF_ROUTE) > 0:
+				for pdx, path in enumerate(paths):
+					road_list = []
+					#print(' Path {0}:'.format(pdx) )
+					segments = paths[pdx].find('segments')
+					segment_list = segments.findall('segment')
+					for seg in segment_list:
+						road = seg.find('road')
+						#print('  {0}'.format(road.text) )
+						road_list.append(road.text)
+					if road_list == PREF_ROUTE:
+						#print('Using Route {0}'.format(pdx) )
+						route_index = pdx
+						break
 
 			if route_index==[]:
 				route_index = 0
@@ -264,7 +273,7 @@ def main(config_file):
 					#print('  {0}'.format(road.text) )
 					road_list.append(road.text)
 
-			print('{0}\nCaltrans/511 travel time for route on {1} ({2})'.format(time.strftime('%A, %d %b %Y, %H:%M',nowTime),road_list,route_index) )
+			print('{0}\nExpected travel time for route on {1} ({2})'.format(time.strftime('%A, %d %b %Y, %H:%M',nowTime),road_list,route_index) )
 
 			# get Travel Times
 			curTime = int(paths[route_index].find('currentTravelTime').text)
