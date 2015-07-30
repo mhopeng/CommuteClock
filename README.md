@@ -6,12 +6,12 @@ The project is designed for car commuters in the San Francisco Bay area and it m
 
 ![cclock_1](https://cloud.githubusercontent.com/assets/13460989/8977347/2ea9ce9e-364d-11e5-900f-bea73bebcab5.jpg)
 
-The software portion of the project is a basically a simple example of using the 511.org API for Driving Times Services.
+The software portion of the project is a basically a simple example of using the 511.org API for Driving Times Services (http://511.org/developer-resources_driving-times-api.asp).
 
-The hardware portion of the project uses a Raspberry Pi with two LED displays to display two things:  
+The hardware portion of the project uses a Raspberry Pi with two LED displays to display two things:
 
-1. A constantly updated estimate of the predicted arrival time for a given driving route.
-2. The recent history of the traffic conditions on the driving route.
+1. A regularly updated estimate of the predicted arrival time for a given driving route.
+2. The recent history of the traffic conditions on the driving route so that the trend can be seen.
 
 Software:  
 The shell script "get_drive_time.sh" illustrates the use of the three 511.org Driving Times API functions.
