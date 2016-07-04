@@ -1,5 +1,8 @@
 # CommuteClock
-A software + hardware project for predicting car commute times in the San Francisco Bay area. 
+NOTE: This project has not been updated for the new 511.org APIs (July 2016).
+An update is in progress... 
+
+A software + hardware project for predicting car commute times in the San Francisco Bay area.
 
 CommuteClock is a hardware project to create a "clock" which displays the projected arrival time when traveling by car.
 The time shown on the clock is the time you should expect to arrive at your destination if you leave immediately.
@@ -26,12 +29,12 @@ The hardware design uses a Raspberry Pi with two LED displays:
 	https://www.adafruit.com/products/879
 2. 8x8 multicolor LED matrix display with I2C controller:
 	http://www.adafruit.com/products/902
-	
+
 The python script "display_drive_time_8x8.py" will request the current driving times data and display the results on the LED displays.
 Various parameters for operation are given in the configuration file "CommuteClock.cfg". Sample configuration files for supervisord are included which will start the clock automatically when the RPi is booted.
 
 Documentation for connecting the displays and using the appropriate python libraries is here:  
-https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up	
+https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up
 
 ![cclock_pi](https://cloud.githubusercontent.com/assets/13460989/8977349/326b9292-364d-11e5-8cb1-61277df2e736.jpg)
 
