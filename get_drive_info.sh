@@ -2,25 +2,25 @@
 #
 # bash script which illustrates the basic use of the 511 Traffic Driving Times API.
 #  More info and free registration for a API Token at:
-#  http://www.511.org/developer-resources_driving-times-api.asp
+#  http://511.org/developers/list/resources/
+#
+# These examples use XML data, but you can use JSON by changing the "format" parameter.
+#
+# Matthew Hopcroft
+#   mhopeng@gmail.com
 
-API_TOKEN=1d19c537-9bf7-4687-bc8f-1e6e13c22ba7
+API_TOKEN=xxxxxxxx-yyyy-zzzz-wwww-vvvvvvvvvvvv
 
-START=1473
-DEST=1061
+URL_BASE="http://api.511.org"
 
-# Step 1: get list of all possible origin points in the network:
-echo "wget -O origins1.xml http://services.my511.org/traffic/getoriginlist.aspx?token=$API_TOKEN"
-wget -O drive_origins1.xml "http://services.my511.org/traffic/getoriginlist.aspx?token=$API_TOKEN"
+# Step 1: Get list of all "roads" included in the 511 data set:
+echo "wget -O roads.xml $URL_BASE/traffic/roads?api_key=$API_TOKEN&limit=10000&format=xml"
+wget -O roads.xml "$URL_BASE/traffic/roads?api_key=$API_TOKEN&limit=10000&format=xml"
 
-# Step 2: Get list of all possible destination points for the selected origin:
-echo "wget -O destinations1.xml http://services.my511.org/traffic/getdestinationlist.aspx?token=$API_TOKEN&o=$START"
-wget -O drive_destinations1.xml "http://services.my511.org/traffic/getdestinationlist.aspx?token=$API_TOKEN&o=$START"
+# Step 2: Get list of all "traffic segments" on the road of interest:
+#  This example uses 280 S
+echo "wget -O segments.xml http://services.my511.org/traffic/traffic_segments?api_key=$API_TOKEN&road=511.org/27775&limit=10000&format=xml"
+wget -O segments.xml "http://services.my511.org/traffic/traffic_segments?api_key=$API_TOKEN&road=511.org/27775&limit=10000&format=xml"
 
-# NOT SHOWN: Somehow select your start and endpoints from the xml files returned above.
-#  For one-of uses, use the web page at 511.org to select intersections, then search the
-#  xml files for these intersections to get the identifier for the intersection.
-
-# Step 3: Request drive time data for the origin and destination selected from above
-echo "wget -O drivetime1.xml http://services.my511.org/traffic/getpathlist.aspx?token=$API_TOKEN&o=$START&d=$DEST"
-wget -O drive_drivingtime1.xml "http://services.my511.org/traffic/getpathlist.aspx?token=$API_TOKEN&o=$START&d=$DEST"
+# NOT SHOWN: Somehow select your traffic segments from the xml files returned above.
+#  The segments are returned in order, North to South, with ascending id numbers.

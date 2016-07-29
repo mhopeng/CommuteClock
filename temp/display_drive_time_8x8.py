@@ -5,21 +5,14 @@
 # Script to display the estimated arrival time and recent history for a car commute
 #  on a 7-segment LED and a multicolor 8x8 LED matrix controlled by a Raspberry Pi.
 #  Uses the traffic data from 511.org (http://www.511.org).
-# The script uses configuration file "CommuteClock.cfg" in same directory, or give config
-#  file location as first command line argument. See the configuration file for
-#  details about the configuration options, including route selection.
-#
-# Note: Yellow bars at the top of the recent history display (LED matrix) indicate that
-#  a traffic incident has been reported on the route by CHP. See the CHP incident webpage
-#  for details: http://mobile.usablenet.com/mt/traffic.511.org/LatestNews?un_jtt_v_new_section=CurrentIncidents#CurrentIncidents
+# The script uses configuration file "CommuteClock.cfg" in same directory, or give config 
+#   file location as first command line argument.
 #
 #  511 API info at: http://511.org/developer-resources_driving-times-api.asp
 #  Hardware info at: https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up
 #
 # Matt Hopcroft
 #  mhopeng@gmail.com
-#
-
 #
 # v1.7 Jul2015
 #   set default for preferred route to first route returned by 511
@@ -46,7 +39,7 @@
 #
 # 511 Driving Times API
 #  See: http://511.org/developer-resources_driving-times-api.asp
-#
+# 
 # Example Request URL:
 # wget -O drivetime1.xml "http://services.my511.org/traffic/getpathlist.aspx?token=xxxxxxxx-yyyy-zzzz-wwww-vvvvvvvvvvvv&o=88&d=1061"
 #
@@ -106,7 +99,7 @@ if len(sys.argv) < 2:
 	config_file = os.path.join(config_file,'CommuteClock.cfg')
 else:
 	config_file = sys.argv[1]
-
+	
 
 ##
 verstring = "CommuteClock v1.7"
@@ -125,8 +118,7 @@ numRetries = 5 # number of retries before failing when 511 replies are malformed
 def main(config_file):
 
 	print('{0}\n\n{1}: Display Commute Time\n  [data provided by 511.org: http://www.511.org]\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
-
-	##
+	
 	# open the configuration file
 	print('Reading Config file ' + config_file)
 	config = ConfigParser.SafeConfigParser()
@@ -140,7 +132,7 @@ def main(config_file):
 		print('    (Config file "{0}")'.format(config_file) )
 		print("{0}".format(sys.exc_info()) )
 		sys.exit(1)
-
+		
 	# get the config values
 	try:
 		API_TOKEN = config.get('USER','API_TOKEN')
@@ -149,19 +141,23 @@ def main(config_file):
 			if DATA_FILE: print('Commute Data will be saved to: {0}'.format(DATA_FILE) )
 		else:
 			DATA_FILE = []
-
-		ROADS = config.get('COMMUTE','ROADS')
-		SEG_LIST = config.get('COMMUTE','SEG_LIST').split(',')
+		START_POINT = config.get('COMMUTE','START_POINT')
+		END_POINT = config.get('COMMUTE','END_POINT')
+		if config.has_option('COMMUTE','PREF_ROUTE'):
+			PREF_ROUTE = config.get('COMMUTE','PREF_ROUTE').split(',')
+			if PREF_ROUTE: print('Preferred commute route: {0}'.format(PREF_ROUTE) )
+		else:
+			PREF_ROUTE = []
+		#PREF_ROUTE = config.get('COMMUTE','PREF_ROUTE').split(',')
 		EST_OTHER = int(config.get('COMMUTE','EST_OTHER'))
-
 		UPDATE_INTERVAL = int(config.get('DISPLAY','UPDATE_INTERVAL'))
 		COMMUTE_PIXEL = int(config.get('DISPLAY','COMMUTE_PIXEL'))
 	except:
 		print("ERROR: Unable to read from config file")
 		print(" Unexpected error: {0}".format(sys.exc_info()) )
 		sys.exit(1)
+		
 
-	##
 	# initialize LED displays
 	print('Initializing LED displays')
 	# Create display instance with I2C address (eg 0x70).
@@ -196,40 +192,42 @@ def main(config_file):
 	edraw.line((1,1,6,6), fill=(255,0,0))
 	edraw.line((1,6,6,1), fill=(255,0,0))
 
-
 	##
 	# main loop
 	print('')
 	retries = 0			# for retrying when errors are received
 	update_count = 0	# for updating LED matrix display
-
+	
 	while retries < numRetries:
 		try:
 
-			# blink colon to show update in progress
+			# blank colon to show update in progress
 			sevenseg.set_colon(False)
 			sevenseg.write_display()
 			print('Requesting traffic data from 511.org...')
 
 			# get the traffic info
-			r = requests.get('http://api.511.org/traffic/traffic_segments?api_key={0}&road={1}&limit=10000&format=xml'.format(API_TOKEN,ROADS))
+			r = requests.get('http://services.my511.org/traffic/getpathlist.aspx?token={2}&o={0}&d={1}'.format(START_POINT,END_POINT,API_TOKEN))
 
 			if r.status_code != 200:
 				print('ERROR: Problem with URL request')
 				print('Response status code {0}'.format(r.status_code) )
 				retries += 1
-
+				time.sleep(1)
+				continue
+			
 			elif r.content.find('Error') >= 0:
 				print('WARNING: 511 server returned an error ({0})\n'.format(retries) )
 				print(r.content)
 				retries += 1 # quit after trying a few times
 				time.sleep(1)
 				continue
+
 			else: retries = 0
 
 			nowTime = time.localtime()
-
-			# blink colon to show update in progress
+			
+			# blank colon to show update in progress
 			sevenseg.set_colon(True)
 			sevenseg.write_display()
 
@@ -241,49 +239,62 @@ def main(config_file):
 				print('ERROR: XML parse error.')
 				continue
 
-
-			# the xml tree contains "segments", i.e portions of roads.
-			traffic_segments = root.find('traffic_segments')
-			segments = traffic_segments.findall('traffic_segment')
-			if len(segments) == 0:
-				print('ERROR: no traffic segments found')
+			# the xml tree contains "paths", i.e. possible driving routes
+			#  usually the shortest route is listed first but this is not guaranteed
+			paths = root.findall('path')
+			if len(paths) > 1 and len(PREF_ROUTE) == 0:
+				print('WARNING: Received {0} possible routes.'.format(len(paths)) )
+			if len(paths) == 0:
+				print('ERROR: no routes found')
 				sys.exit(1)
 
+			# get roads in possible routes ("paths"), match a route to preferred route
+			#  if one was specified in config file
+			route_index = []
+			if len(PREF_ROUTE) > 0:
+				for pdx, path in enumerate(paths):
+					road_list = []
+					#print(' Path {0}:'.format(pdx) )
+					segments = paths[pdx].find('segments')
+					segment_list = segments.findall('segment')
+					for seg in segment_list:
+						road = seg.find('road')
+						#print('  {0}'.format(road.text) )
+						road_list.append(road.text)
+					if road_list == PREF_ROUTE:
+						#print('Using Route {0}'.format(pdx) )
+						route_index = pdx
+						break
 
+			if route_index==[]:
+				route_index = 0
+				road_list = []
+				print('WARNING: Preferred route not found. Using first route in list.')
+				segments = paths[route_index].find('segments')
+				segment_list = segments.findall('segment')
+				for seg in segment_list:
+					road = seg.find('road')
+					#print('  {0}'.format(road.text) )
+					road_list.append(road.text)
+
+			print('{0}\nExpected travel time for route on {1} ({2})'.format(time.strftime('%A, %d %b %Y, %H:%M',nowTime),road_list,route_index) )
 
 			# get Travel Times
-			# Scan the entire xml tree and pull out the segments that match the list of segments on our route.
-			print('Find matching segments...')
-			# get roads in path, match to target list
-			seg_names = []
-			travel_times = []
-			hist_travel_times = []
-			for pdx, segment in enumerate(segments):
-				segment_id = segment.find('id').text
-				if segment_id in SEG_LIST:
-					#print(' Segment {0}'.format(segment_id))
-					seg_names.append(segment_id)
-					# travel time values are in seconds
-					travel_times.append(int(segment.find('current_travel_time').text))
-					hist_travel_times.append(int(segment.find('historical_travel_time').text))
-
-			print('{0}\nExpected travel time for route on {1} ({2})'.format(time.strftime('%A, %d %b %Y, %H:%M',nowTime),ROADS,len(seg_names)) )
-			curTime = sum(travel_times)/60
-			typTime = sum(hist_travel_times)/60
+			curTime = int(paths[route_index].find('currentTravelTime').text)
 			print(' Current Travel Time with traffic: {0} min'.format(curTime) )
+			typTime = int(paths[route_index].find('typicalTravelTime').text)
 			print(' Typical Travel Time at this time: {0} min'.format(typTime) )
 
-			# # get traffic incidents
-			# incidents = paths[route_index].findall('incidents')
-			# incident_list = incidents[0].findall('incident')
-			# if len(incident_list) > 0:
-			# 	print(' Traffic incidents:')
-			# 	for incident in incident_list:
-			# 		print('  {0}'.format(incident.text) )
-			# else:
-			# 	print(' No traffic incidents reported at this time')
-			incident_list = []
-
+			# get traffic incidents
+			incidents = paths[route_index].findall('incidents')
+			incident_list = incidents[0].findall('incident')
+			if len(incident_list) > 0:
+				print(' Traffic incidents:')
+				for incident in incident_list:
+					print('  {0}'.format(incident.text) )
+			else:
+				print(' No traffic incidents reported at this time')
+				
 			# estimate arrival time
 			estDrive = EST_OTHER + curTime
 			estDriveTime = time.localtime(time.mktime(nowTime) + (60 * estDrive))
@@ -306,7 +317,7 @@ def main(config_file):
 			if update_count == 0 or update_count > UPDATE_INTERVAL:
 				#print('Update LED matrix')
 				pxArray,tiArray = update_matrix(display,pxArray,curTime,typTime,incident_list,tiArray,COMMUTE_PIXEL)
-
+				
 				# reset update count
 				update_count = 1
 
@@ -327,7 +338,7 @@ def main(config_file):
 			#print("sys.exec_info(): {0}".format(sys.exc_info()) )
 			break
 			print('')
-		except requests.exceptions.ConnectionError:
+		except ConnectionError:
 			print('\n** Connection Error **  ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
 			print("     Will Retry Connection...")
 			retries += 1 # quit after trying a few times
@@ -394,7 +405,7 @@ def update_matrix(display,pxArray,curTime,typTime,incident_list,tiArray,COMMUTE_
 
 	return pxArray,tiArray
 
-
+				
 ####
 # a function for animated "splash screen" at startup
 def startup_splash(display,sevenseg):
@@ -402,7 +413,7 @@ def startup_splash(display,sevenseg):
 
 	# Clear the display buffer.
 	display.clear()
-
+	
 	# turn on colon
 	colonset = True
 	sevenseg.set_colon(colonset)

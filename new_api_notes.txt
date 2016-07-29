@@ -1,0 +1,47 @@
+The New 511 API uses HTTP requests with the format:
+
+http://api.511.org/traffic/XXXXXX?api_key=<your_key>
+
+For example, to return a list of all roads and their id numbers:
+
+http://api.511.org/traffic/roads?api_key=fec28ef2-4986-43ba-85b4-9cff2420bb3c&limit=10000
+
+The id number for "I-280 S" is 511.org/27775
+
+Traffic information is provided for "road segments". Each segment has an id number.
+You can request the current information for road segments, filtered by road name. For all segments on 280S, use:
+
+http://api.511.org/traffic/traffic_segments?api_key=fec28ef2-4986-43ba-85b4-9cff2420bb3c&road=511.org/27775&limit=10000
+
+Currently there are 1732 road segments in the 511 system for the Bay Area.
+There are 68 segments on 280S. Fortunately, they are returned in geographic order, from North to South, and they are numbered in ascending order.
+The relevant segments for the SF-PA route on 280 are 104130 to 104330:
+
+511.org/104130: I-280 S from I-280 S @ CA-1 S to I-280 S @ SERRAMONTE BLVD
+	...
+511.org/104330: I-280 S from I-280 S @ SAND HILL RD to I-280 S @ ALPINE RD
+
+Some parts of other roads are also relevant. CA-1 N has two relevant segments.
+
+CA-1 N (511.org/8269)
+511.org/151100: CA-1 N from CA-1 N @ SKYLINE BLVD to CA-1 N @ SERRAMONTE BLVD
+511.org/151110: CA-1 N from CA-1 N @ SERRAMONTE BLVD to CA-1 N @ I-280 N
+
+CA-35 is in the list of roads (511.org/64427) but at this time it has no road segments associated with it (no data). Same for Sand Hill and Alpine roads.
+
+Options:
+-Request all data for 280S and CA1N, and then filter out the relevant parts (600 kb per request).
+http://api.511.org/traffic/traffic_segments?api_key=fec28ef2-4986-43ba-85b4-9cff2420bb3c&road=511.org/8269,511.org/27775&limit=10000
+
+-Format a geographic linestring, and filter request for segments on that line
+
+CA-1 N @ SKYLINE BLVD
+	37.668275181750772 -122.485035422288661
+CA-1 N @ SERRAMONTE BLVD
+	37.67050551445196 -122.478179226533285
+I-280 S @ CA-1 S
+	37.679198252036748 -122.471830761271818
+I-280 S @ ALPINE RD
+	37.40889265886431 -122.194343806917232
+
+&tolerance=100&geography=LINESTRING(+37.668275181750772-122.485035422288661+37.67050551445196-122.478179226533285+37.679198252036748-122.471830761271818+37.40889265886431-122.194343806917232)
