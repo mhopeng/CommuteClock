@@ -1,6 +1,5 @@
 # CommuteClock
-NOTE: This project has not been updated for the new 511.org APIs (July 2016).
-An update is in progress... 
+NOTE: This project has been updated for the new 511.org APIs (July 2016).
 
 A software + hardware project for predicting car commute times in the San Francisco Bay area.
 
