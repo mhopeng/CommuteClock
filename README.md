@@ -10,7 +10,7 @@ The project is designed for car commuters in the San Francisco Bay area and it m
 
 ![cclock_1](https://cloud.githubusercontent.com/assets/13460989/8977347/2ea9ce9e-364d-11e5-900f-bea73bebcab5.jpg)
 
-The software portion of the project is a basically a simple example of using the 511.org API for Driving Times Services (http://511.org/developer-resources_driving-times-api.asp).
+The software portion of the project is a basically a simple example of using the [511.org API for Traffic](http://511.org/developers/list/resources/).
 
 The hardware portion of the project uses a Raspberry Pi with two LED displays to display two things:
 
