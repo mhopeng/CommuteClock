@@ -109,6 +109,7 @@ elif r.content.find('Error') >= 0:
 
 # establish time of data
 nowTime = time.localtime()
+print(' Local time is ' + time.strftime("%Y/%m/%d-%H:%M:%S",nowTime))
 
 # r.content contains the reply XML string
 # parse the XML into a tree
@@ -122,7 +123,7 @@ segments = traffic_segments.findall('traffic_segment')
 
 # Scan the entire xml tree and pull out the segments that match the list of segments on our route.
 print('Find matching segments...')
-# get roads in path, match to target
+# get roads in path, match to target list
 seg_names = []
 travel_times = []
 hist_travel_times = []
@@ -131,6 +132,7 @@ for pdx, segment in enumerate(segments):
 	if segment_id in seg_list:
 		#print(' Segment {0}'.format(segment_id))
 		seg_names.append(segment_id)
+		# travel time values are in seconds
 		travel_times.append(int(segment.find('current_travel_time').text))
 		hist_travel_times.append(int(segment.find('historical_travel_time').text))
 
