@@ -4,15 +4,19 @@
 #
 # Script to display the estimated arrival time and recent history for a car commute
 #  on a 7-segment LED and a multicolor 8x8 LED matrix controlled by a Raspberry Pi.
-#  Uses the traffic data from 511.org (http://www.511.org).
+#  Uses the traffic data from Google Maps (http://maps.google.com) and 511.org (http://www.511.org).
 # The script uses configuration file "CommuteClock.cfg" in same directory, or give config
 #  file location as first command line argument. See the configuration file for
 #  details about the configuration options, including route selection.
 #
+# You will need to register for Google and/or 511.org API tokens in order to use this script.
+#
 # Note: Yellow bars at the top of the recent history display (LED matrix) indicate that
 #  a traffic incident has been reported on the route by CHP. See the CHP incident webpage
-#  for details: http://mobile.usablenet.com/mt/traffic.511.org/LatestNews?un_jtt_v_new_section=CurrentIncidents#CurrentIncidents
+#  for incident details:
+#	http://mobile.usablenet.com/mt/traffic.511.org/LatestNews?un_jtt_v_new_section=CurrentIncidents#CurrentIncidents
 #
+#  Google Maps API info at: https://developers.google.com/maps/documentation/distance-matrix/
 #  511 API info at: http://511.org/developer-resources_driving-times-api.asp
 #  Hardware info at: https://learn.adafruit.com/matrix-7-segment-led-backpack-with-the-raspberry-pi/hooking-everything-up
 #
@@ -20,6 +24,11 @@
 #  mhopeng@gmail.com
 #
 
+# V2.0 Jan2017
+#   switch to Google Maps for traffic data
+#	NB: Traffic incident reporting is NOT functional in this version
+#	In future, 511.org or Google may provide useful traffic incident reports.
+#	As of this version, 511.org data is not used.
 #
 # v1.7 Jul2015
 #   set default for preferred route to first route returned by 511
@@ -42,32 +51,6 @@
 #	startup splash is now the xy axes
 # v1.0 Jan2015
 #
-
-#
-# 511 Driving Times API
-#  See: http://511.org/developer-resources_driving-times-api.asp
-#
-# Example Request URL:
-# wget -O drivetime1.xml "http://services.my511.org/traffic/getpathlist.aspx?token=xxxxxxxx-yyyy-zzzz-wwww-vvvvvvvvvvvv&o=88&d=1061"
-#
-# Example Response:
-#
-# <?xml version="1.0" encoding="UTF-8"?>
-# <paths>
-# 	<path>
-# 		<currentTravelTime>22</currentTravelTime>
-# 		<typicalTravelTime>22</typicalTravelTime>
-# 		<miles>24.3</miles>
-# 		<segments>
-# 			<segment>
-# 			<road>I-280 S</road>
-# 			</segment>
-# 		</segments>
-# 		<incidents>
-# 			<incident>CHP : Overturned vehicle on I-280 Southbound before Bunker Hill Dr (San Mateo). Center Divider blocked. Expect delays.</incident>
-# 		</incidents>
-# 	</path>
-# </paths>
 #
 
 #
@@ -106,10 +89,11 @@ if len(sys.argv) < 2:
 	config_file = os.path.join(config_file,'CommuteClock.cfg')
 else:
 	config_file = sys.argv[1]
+# consider adding destinations as command line inputs
 
 
 ##
-verstring = "CommuteClock v1.7"
+verstring = "CommuteClock v2.0"
 ##
 
 # "color levels" on the bar graph
@@ -124,7 +108,7 @@ numRetries = 5 # number of retries before failing when 511 replies are malformed
 
 def main(config_file):
 
-	print('{0}\n\n{1}: Display Commute Time\n  [data provided by 511.org: http://www.511.org]\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
+	print('{0}\n\n{1}: Display Commute Time\n  [data provided by Google Maps and 511.org]\n   [https://developers.google.com/maps/]\n   [http://www.511.org/developers/]\n'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime()),verstring) )
 
 	##
 	# open the configuration file
@@ -143,12 +127,16 @@ def main(config_file):
 
 	# get the config values
 	try:
+		USER_KEY = config.get('USER','USER_KEY')
 		API_TOKEN = config.get('USER','API_TOKEN')
 		if config.has_option('USER','DATA_FILE'):
 			DATA_FILE = config.get('USER','DATA_FILE')
 			if DATA_FILE: print('Commute Data will be saved to: {0}'.format(DATA_FILE) )
 		else:
 			DATA_FILE = []
+
+		STARTPOINT = config.get('COMMUTE','ORIGIN')
+		ENDPOINT = config.get('COMMUTE','DESTINATION')
 
 		ROADS = config.get('COMMUTE','ROADS')
 		SEG_LIST = config.get('COMMUTE','SEG_LIST').split(',')
@@ -205,27 +193,34 @@ def main(config_file):
 
 	while retries < numRetries:
 		try:
-
 			# blink colon to show update in progress
 			sevenseg.set_colon(False)
 			sevenseg.write_display()
-			print('Requesting traffic data from 511.org...')
+			print('Requesting traffic data from Google Maps... ({0})'.format(time.strftime('%A, %d %b %Y, %H:%M:%S',time.localtime())) )
 
-			# get the traffic info
-			r = requests.get('http://api.511.org/traffic/traffic_segments?api_key={0}&road={1}&limit=10000&format=xml'.format(API_TOKEN,ROADS))
+			# Get current travel time from Google Maps
+			rGGL = requests.get('https://maps.googleapis.com/maps/api/distancematrix/xml?units=imperial&origins={0}&destinations={1}&departure_time=now&key={2}'.format(STARTPOINT,ENDPOINT,USER_KEY))
 
-			if r.status_code != 200:
-				print('ERROR: Problem with URL request')
-				print('Response status code {0}'.format(r.status_code) )
+			# get the traffic incident info from 511
+			# r511 = requests.get('http://api.511.org/traffic/traffic_segments?api_key={0}&road={1}&limit=10000&format=xml'.format(API_TOKEN,ROADS))
+
+			if rGGL.status_code != 200:
+				print('ERROR: Problem with Google API request')
+				print('Response status code {0}'.format(rGGL.status_code) )
 				retries += 1
-
-			elif r.content.find('Error') >= 0:
-				print('WARNING: 511 server returned an error ({0})\n'.format(retries) )
-				print(r.content)
-				retries += 1 # quit after trying a few times
-				time.sleep(1)
 				continue
-			else: retries = 0
+
+			# elif r511.status_code != 200:
+			# 	print('ERROR: Problem with 511 API request')
+			# 	print('Response status code {0}'.format(r511.status_code) )
+			# 	retries += 1
+			#
+			# elif r511.content.find('Error') >= 0:
+			# 	print('WARNING: 511 server returned an error ({0})\n'.format(retries) )
+			# 	print(r511.content)
+			# 	retries += 1 # quit after trying a few times
+			# 	time.sleep(1)
+			# 	continue
 
 			nowTime = time.localtime()
 
@@ -236,42 +231,50 @@ def main(config_file):
 			# r.content contains the reply XML string
 			# parse the XML into a tree
 			try:
-				root = ET.fromstring(r.content)
+				root = ET.fromstring(rGGL.content)
 			except:
 				print('ERROR: XML parse error.')
+				time.sleep(5)
+				retries += 1 # quit after trying a few times
 				continue
 
 
+			# the xml tree contains routes between the destinations
+			#  arranged in rows of elements. Google returns the "best" route
+			#  first, so look for one row with one element
+			rows = root.findall('row')
+			if len(rows) > 1:
+				print('WARNING {0} rows.'.format(len(rows)) )
+			if len(rows) == 0:
+				print('ERROR: no routes found (0 rows)')
+				retries += 1 # quit after trying a few times
+				continue
+
+			elements = rows[0].findall('element')
+			if len(elements) > 1:
+				print('WARNING {0} elements.'.format(len(elements)) )
+			if len(elements) == 0:
+				print('ERROR: no routes found (0 elements)')
+				retries += 1 # quit after trying a few times
+				continue
+
+
+			# get Travel Time
+			#  time values are in seconds
+			durTraf = elements[0].find('duration_in_traffic')
+			curTime = int(durTraf.find('value').text)
+			print(' Current Travel Time with traffic: {0:.2f} min'.format(curTime/60) )
+			durTyp = elements[0].find('duration')
+			typTime = int(durTyp.find('value').text)
+			print(' Travel Time without traffic: {0:.2f} min'.format(typTime/60) )
+
+
 			# the xml tree contains "segments", i.e portions of roads.
-			traffic_segments = root.find('traffic_segments')
-			segments = traffic_segments.findall('traffic_segment')
-			if len(segments) == 0:
-				print('ERROR: no traffic segments found')
-				sys.exit(1)
-
-
-
-			# get Travel Times
-			# Scan the entire xml tree and pull out the segments that match the list of segments on our route.
-			print('Find matching segments...')
-			# get roads in path, match to target list
-			seg_names = []
-			travel_times = []
-			hist_travel_times = []
-			for pdx, segment in enumerate(segments):
-				segment_id = segment.find('id').text
-				if segment_id in SEG_LIST:
-					#print(' Segment {0}'.format(segment_id))
-					seg_names.append(segment_id)
-					# travel time values are in seconds
-					travel_times.append(int(segment.find('current_travel_time').text))
-					hist_travel_times.append(int(segment.find('historical_travel_time').text))
-
-			print('{0}\nExpected travel time for route on {1} ({2})'.format(time.strftime('%A, %d %b %Y, %H:%M',nowTime),ROADS,len(seg_names)) )
-			curTime = sum(travel_times)/60
-			typTime = sum(hist_travel_times)/60
-			print(' Current Travel Time with traffic: {0} min'.format(curTime) )
-			print(' Typical Travel Time at this time: {0} min'.format(typTime) )
+			# traffic_segments = root.find('traffic_segments')
+			# segments = traffic_segments.findall('traffic_segment')
+			# if len(segments) == 0:
+			# 	print('ERROR: no traffic segments found')
+			# 	sys.exit(1)
 
 			# # get traffic incidents
 			# incidents = paths[route_index].findall('incidents')
@@ -284,9 +287,10 @@ def main(config_file):
 			# 	print(' No traffic incidents reported at this time')
 			incident_list = []
 
+
 			# estimate arrival time
-			estDrive = EST_OTHER + curTime
-			estDriveTime = time.localtime(time.mktime(nowTime) + (60 * estDrive))
+			#  google provides end-to-end estimate, so no need for other factors
+			estDriveTime = time.localtime(time.mktime(nowTime) + (curTime)) # units of seconds
 			print(' Estimated time of Arrival: {0}'.format(time.strftime('%A, %d %b %Y, %H:%M',estDriveTime)) )
 
 			# show arrival time estimate on 7-segment display
@@ -305,7 +309,7 @@ def main(config_file):
 			#   update at startup, and then at a multiple of data updates
 			if update_count == 0 or update_count > UPDATE_INTERVAL:
 				#print('Update LED matrix')
-				pxArray,tiArray = update_matrix(display,pxArray,curTime,typTime,incident_list,tiArray,COMMUTE_PIXEL)
+				pxArray,tiArray = update_matrix(display,pxArray,curTime/60,typTime/60,incident_list,tiArray,COMMUTE_PIXEL)
 
 				# reset update count
 				update_count = 1
@@ -319,6 +323,9 @@ def main(config_file):
 			time.sleep(60-time.localtime()[5])
 			print('')
 
+			# reset the retries counter; if we got here it was a successful loop
+			retries = 0
+
 
 		# Use Ctrl-C to quit manually, or for Supervisord to kill process
 		except KeyboardInterrupt:
@@ -330,6 +337,7 @@ def main(config_file):
 		except requests.exceptions.ConnectionError:
 			print('\n** Connection Error **  ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
 			print("     Will Retry Connection...")
+			time.sleep(10)
 			retries += 1 # quit after trying a few times
 		except:
 			print('\n** Other Exception **  ' + time.strftime("%Y/%m/%d-%H:%M:%S",time.localtime()) )
@@ -352,6 +360,14 @@ def main(config_file):
 ####
 # a function to update the LED matrix display
 def update_matrix(display,pxArray,curTime,typTime,incident_list,tiArray,COMMUTE_PIXEL):
+	"""
+	update_matrix(display,pxArray,curTime,typTime,incident_list,tiArray,COMMUTE_PIXEL)
+
+	A function to update the LED matrix display
+		curTime and typTime should have units of minutes
+
+	"""
+
 	# Clear the display buffer.
 	display.clear()
 
@@ -363,7 +379,7 @@ def update_matrix(display,pxArray,curTime,typTime,incident_list,tiArray,COMMUTE_
 	#  v1.2 - use reported typical value for baseline
 	#dispTime = int(max(0,curTime - baselvl)/COMMUTE_PIXEL)
 	dispTime = int(max(0,curTime - typTime)/COMMUTE_PIXEL)
-	#print('[dispTime: {0}]'.format(dispTime) )
+	print(' [dispTime: {0}]'.format(dispTime) )
 	# fill in values in the pixel array according to the "color levels"
 	if dispTime > 0:
 		pxArray[0][0:dispTime] = [BicolorMatrix8x8.GREEN] * (dispTime)

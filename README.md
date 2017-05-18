@@ -1,17 +1,17 @@
 # CommuteClock
-NOTE: This project has been updated for the new 511.org APIs (July 2016). However, the traffic APIs are not yet functional.
-So, at this time, the code here will return dummy values.
+NOTE: As of 2017, this project has been converted from 511.org APIs to Google Traffic APIs.
 
 A software + hardware project for predicting car commute times in the San Francisco Bay area.
 
 CommuteClock is a hardware project to create a "clock" which displays the projected arrival time when traveling by car.
 The time shown on the clock is the time you should expect to arrive at your destination if you leave immediately.
 In addition, the recent traffic history is shown, so that you can see if conditions are getting better or worse.
-The project is designed for car commuters in the San Francisco Bay area and it makes use of the traffic data provided by 511.org.
+The project is designed for car commuters, and makes use of the data provided by Google.
+It could be modified to support any other mode of transport supported by Google in your region.
 
 ![cclock_1](https://cloud.githubusercontent.com/assets/13460989/8977347/2ea9ce9e-364d-11e5-900f-bea73bebcab5.jpg)
 
-The software portion of the project is a basically a simple example of using the [511.org API for Traffic](http://511.org/developers/list/resources/).
+The software portion of the project is a basically a simple example of using the [Google API for Traffic](https://developers.google.com/maps/documentation/distance-matrix/intro#traffic-model).
 
 The hardware portion of the project uses a Raspberry Pi with two LED displays to display two things:
 
@@ -19,8 +19,8 @@ The hardware portion of the project uses a Raspberry Pi with two LED displays to
 2. The recent history of the traffic conditions on the driving route so that the trend can be seen.
 
 Software:  
-The shell script "get_drive_time.sh" illustrates the use of the three 511.org Driving Times API functions.
-The python script "get_drive_time.py" requests current driving times data from 511.org and displays the result.
+The python script "get_drive_time.py" requests current driving times data from Google and displays the result.
+The python script "display_drive_time_8x8.py" will request the current driving time and display the results on the LED displays (see below).
 
 Hardware:  
 The hardware design uses a Raspberry Pi with two LED displays:
