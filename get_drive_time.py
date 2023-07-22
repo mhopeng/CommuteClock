@@ -7,6 +7,7 @@
 #   mhopeng@gmail.com
 #
 # v1.0 Jan2017
+#   Uses google traffic data
 #   based on previous version using 511 data
 #
 # Example URL:
@@ -48,7 +49,7 @@ import time
 
 # The Google Developer API Key to use for requesting data:
 #  Request a API Key (free registration) at: https://developers.google.com/maps/documentation/distance-matrix/start#get-a-key
-api_token='AIzaSyCNqLnRR5ghT8mjclZMsrO-xTfCjwoZPrs'
+api_token='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' # July 2023
 # Start point: "725-825 Point Lobos Ave, San Francisco, CA 94121, USA" (Cliff House)
 startpoint='37.778727,-122.513979'
 # End point: "121 Campus Drive, Stanford, CA 94305, USA" (Lyman)
@@ -63,7 +64,7 @@ if r.status_code != 200:
 	print('ERROR: Problem with Google request')
 	print('Response status code {0}'.format(r.status_code) )
 	sys.exit(r.status_code)
-elif r.content.find('Error') >= 0:
+elif r.text.find('Error') >= 0:
 	print('WARNING: Google server returned an error\n')
 	print(r.content)
 	print('')
@@ -109,4 +110,4 @@ print(' Typical Travel Time at this time: {0:.1f} min'.format(typTime/60) )
 # estimate arrival time
 estDrive = curTime/60
 print(' Estimated time of Arrival: {0}'.format(time.strftime('%A, %d %b %Y, %H:%M',time.localtime(time.mktime(nowTime) + (60 * estDrive)))) )
-print('    [data provided by Google: https://developers.google.com/]\n')
+print('    [data provided by Google: https://developers.google.com/maps/documentation/distance-matrix]\n')
